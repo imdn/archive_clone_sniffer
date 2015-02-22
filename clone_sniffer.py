@@ -6,10 +6,33 @@
 from archiveclonesniffer import *
 from terminaltables import AsciiTable, SingleTable
 import argparse
+import sys
+import os
 
 MAX_TABLE_WIDTH = 0;
 LINE_CHAR = u'\u2500' #'─'
-#LINE_CHAR = '-'
+
+######################################################################
+# To overcome the nasty Unicode - chcp 65001 bug on Windows !@$@#$
+# Bug prevents unicode characters from displaying on stdout or
+# redirecting output to files throwing a UnicodeEncodeError exception
+# Credits - http://stackoverflow.com/a/1432462/979234
+######################################################################
+if sys.platform == "win32":
+    class UniStream(object):
+        __slots__= ("fileno", "softspace",)
+
+        def __init__(self, fileobject):
+            self.fileno = fileobject.fileno()
+            self.softspace = False
+
+        def write(self, text):
+            os.write(self.fileno, text.encode("utf_8") if isinstance(text, unicode) else text)
+
+    sys.stdout = UniStream(sys.stdout)
+    sys.stderr = UniStream(sys.stderr)
+######################################################################
+
 
 class CmdProcessor:
     def __init__(self):
