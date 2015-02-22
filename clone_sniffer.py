@@ -4,7 +4,8 @@
 """
 
 from archiveclonesniffer import *
-from terminaltables import AsciiTable, WindowsTable, SingleTable
+from terminaltables import AsciiTable, SingleTable
+import argparse
 
 MAX_TABLE_WIDTH = 0;
 
@@ -19,7 +20,7 @@ class CmdProcessor:
         parser.add_argument('--force', help = 'Archive to compare an archive against', action="store_true")
 
         operations_group = parser.add_mutually_exclusive_group()
-        operations_group.add_argument ('--add', help="Add archive to database", action="store_true")
+        operations_group.add_argument ('--add', help="Add archive to database. 0-byte files and directories are not added", action="store_true")
         operations_group.add_argument ('--create', help = "Create database", action="store_true")
         operations_group.add_argument ('--reset',  help = "Reinitialize existing database", action="store_true")
         operations_group.add_argument ('--compare', help = "Perform comparisions. Priority (1) Archive vs. DB (2) List of files vs. DB (3) Archive vs. Archive (4) List of files vs. Archive", action="store_true", default=True)
@@ -48,7 +49,7 @@ def print_banner(width, heading=None, char=None):
 def report(data, table_heading=None, description=None, banner=False):
    global MAX_TABLE_WIDTH
    table_data = data
-   table = WindowsTable(table_data, table_heading)
+   table = SingleTable(table_data, table_heading)
    if MAX_TABLE_WIDTH < table.table_width:
       MAX_TABLE_WIDTH = table.table_width
    print
@@ -79,52 +80,7 @@ def show_full_report(matched_files, archive_stats, unmatched_stats):
    print_banner(MAX_TABLE_WIDTH, char=u'\u2500')
 
 
-archive_filenames = [ 'test_rar.rar', 'test_zip.zip', 'test_half.zip']
-
-def create_add():
-   db = Database('archive_db.sqlite')
-   db.resetDB()
-   for archive in archive_filenames:
-       arc = Archive(archive)
-       print "Adding {} to database".format(archive)
-       print "CRC32 - {}".format(archiveclonesniffer.getCRC32(archive))
-       comparator = Comparator(archive=archive, database=db)
-       file_match, archive_match, non_match = comparator.compareArchivexDatabase()
-       if len(file_match) > 1:
-         show_full_report(file_match, archive_match, non_match)
-         print
-         print "ACHTUNG! Did not add {} to database - '{}'".format(archive, db.name)
-       else:
-         db.addArchivetoDB(arc)
-   db.close()
-
-def test():
-   db = Database('archive_db.sqlite')
-   img_files = ['test_file_1.jpg', 'test_file_2.jpg', 'test_file_3.jpg', 'test_file_4.jpg', 'test_file_5.png']
-   #img_files = ['test_file_1.jpg']
-
-   # File(s) vs DB
-   comparator_file = Comparator(files=img_files, database=db);
-   a, b, c = comparator_file.compareFilexDatabase()
-   show_full_report (a,b,c)
-
-   # Archive vs DB
-   comparator_arc = Comparator(archive=archive_filenames[2], database=db)
-   a, b, c = comparator_arc.compareArchivexDatabase()
-   show_full_report (a,b,c)
-
-   # File vs Archive
-   comparator_file_arc = Comparator(archive=archive_filenames[2], files=img_files)
-   a, b, c = comparator_file_arc.compareFilexArchive()
-   show_full_report (a,b,c)
-
-   # Archive vs Archive
-   comparator_file_arc = Comparator(archive=archive_filenames[2], reference_archive=archive_filenames[1])
-   a, b, c = comparator_file_arc.compareArchivexArchive()
-   show_full_report (a,b,c)
-
-
-def do_compare(database, files, archive, archive2):
+def do_comparison(database, files, archive, archive2):
    if database is not None:
       db = Database(database)
       if archive is not None:
@@ -155,7 +111,7 @@ def do_compare(database, files, archive, archive2):
          file_match, archive_match, non_match = comparator.compareFilexArchive()
    else:
       print
-      print "ERROR! Must compare DB vs. Archive OR DB vs. Files OR Archive vs. Archive OR Archive vs. Files"
+      print "ERROR! Must compare {DB vs. Archive} OR {DB vs. Files} OR {Archive vs. Archive} OR {Archive vs. Files}"
       return
 
    show_full_report(file_match, archive_match, non_match)
@@ -165,67 +121,103 @@ def assert_argument_present(param, required_param, argument=None):
       print "ERROR! '{}' argument must be supplied for '{}'".format(required_param,argument)
       sys.exit(0)
 
-def add_archive_to_db(archive, database):
-   assert_argument_present(database, "-db/--database", "-add");
-   assert_argument_present(archive, "-a/--archive", "-add");
-   db = Database(database)
-   arc = Archive(archive)
-   print "Adding {} to database".format(archive)
-   comparator = Comparator(archive=archive, database=db)
-   file_match, archive_match, non_match = comparator.compareArchivexDatabase()
-   if len(file_match) > 1:
-      show_full_report(file_match, archive_match, non_match)
-      print
-      print "ACHTUNG! Did not add {} to database - '{}'".format(archive, db.name)
-   else:
-      db.addArchivetoDB(arc)
-   db.close()
+def add_archive_to_db(archive, database, force_add=False):
+    assert_argument_present(database, "-db/--database", "-add");
+    assert_argument_present(archive, "-a/--archive", "-add");
+    try:
+        db = Database(database)
+        arc = Archive(archive)
+        comparator = Comparator(archive=archive, database=db)
+        file_match, archive_match, non_match = comparator.compareArchivexDatabase()
+        if len(file_match) > 1:
+            show_full_report(file_match, archive_match, non_match)
+            print
+            if not force_add:
+                print "WARNING! Will not add {} to database - '{}' until duplicate files are removed".format(archive, db.name)
+                db.close()
+                return
+            else:
+                print "WARNING! {} contains duplicate files but will be added to database '{}' anyways".format(archive, db.name)
+        print
+        print "Now adding {} to database ...\n".format(archive)
+        db.addArchivetoDB(arc)
+        print "Done"
+        db.close()
+
+    except sqlite3.IntegrityError as e:
+        print "ERROR! Could not write to database. Sqlite3 said: \"{}\"".format(e.message)
+        db.close()
+    except sqlite3.Error as e:
+        print "ERROR! Could not write to database. Sqlite3 said: \"{}\"".format(e.message)
+        db.close()
 
 def reset_db(database):
    assert_argument_present(database, "-db/--database", "-r/-reset")
    print "Resetting database '{}'".format(database)
-   db = Database(database)
-   db.resetDB()
-   db.close()
+   try:
+       db = Database(database)
+       db.resetDB()
+       db.close()
+
+   except sqlite3.Error as e:
+       print "ERROR! Could not reset database. Sqlite3 said: \"{}\"".format(e.message)
+       db.close()
+
 
 def create_db(database):
-   assert_argument_present(database, "-db/--database", "-c/--create")
-   db = Database(database)
-   db.initDB()
-   db.close()
+    assert_argument_present(database, "-db/--database", "-c/--create")
+    try:
+        db = Database(database)
+        db.initDB()
+        db.close()
+
+    except sqlite3.Error as e:
+        print "ERROR! Could not create database. Sqlite3 said: \"{}\"".format(e.message)
+        db.close()
 
 def run_sql_query(database, sql):
    assert_argument_present(database, "-db/--database", "-s/--sql")
-   db = Database(database)
-   header, records = db.runSQL(sql)
-   rows = map(list, records) # Convert tuple of tuples to list of lists
-   data = [header]
-   data.extend(rows)
-   table = SingleTable([map(str,row) for row in data]) # Convert all items in inner-list of lists to strings
-   #table.inner_heading_row_border = False
-   print table.table
-   print "{} row(s) affected".format(len(rows))
-   db.close()
+   try:
+       db = Database(database)
+       header, records = db.runSQL(sql)
+       rows = map(list, records) # Convert tuple of tuples to list of lists
+       data = [header]
+       data.extend(rows)
+       table = SingleTable([map(str,row) for row in data]) # Convert all items in inner-list of lists to strings
+       #table.inner_heading_row_border = False
+       print table.table
+       print "{} row(s) affected".format(len(rows))
+       db.close()
+
+   except sqlite3.Error as e:
+       print "ERROR! Could not run query. Sqlite3 said : \"{}\"".format(e.message)
+       db.close()
+
 
 def delete_archive_from_db(database, archive):
-   assert_argument_present(database, "-db/--database", "-d/--delete")
-   assert_argument_present(database, "-a/--archive", "-d/--delete")
-   db = Database(database)
-   header, records = db.deleteArchive(archive)
-   if header is None and len(records) == 0:
-      print "No entry for '{}' found in database '{}'".format(archive, database)
-   elif len(records) > 1:
-      print "More than one matching archive found. Not deleted"
-      rows = map(list, records) # Convert tuple of tuples to list of lists
-      data = [header]
-      data.extend(rows)
-      table = SingleTable([map(str,row) for row in data]) # Convert all items in inner-list of lists to strings
-      #table.inner_heading_row_border = False
-      print table.table
-      print "{} row(s) affected".format(len(rows))
-   else:
-      print "{} deleted successfully from database '{}'".format(archive, database)
-   db.close()
+    assert_argument_present(database, "-db/--database", "-d/--delete")
+    assert_argument_present(database, "-a/--archive", "-d/--delete")
+    try:
+        db = Database(database)
+        header, records = db.deleteArchive(archive)
+        if header is None and len(records) == 0:
+            print "No entry for '{}' found in database '{}'".format(archive, database)
+        elif len(records) > 1:
+            print "\nMore than one matching archive found. Not deleted"
+            rows = map(list, records) # Convert tuple of tuples to list of lists
+            data = [header]
+            data.extend(rows)
+            table = SingleTable([map(str,row) for row in data]) # Convert all items in inner-list of lists to strings
+            #table.inner_heading_row_border = False
+            print table.table
+            print "\nUse SQL statement - DELETE FROM archive_name WHERE archive_sha1 LIKE '<checksum>' instead"
+        else:
+            print "{} deleted successfully from database '{}'".format(archive, database)
+        db.close()
+
+    except sqlite3.Error as e:
+        print "ERROR! Could not delete archive from database. Sqlite3 said : \"{}\"".format(e.message)
+        db.close()
 
 def init():
    c = CmdProcessor()
@@ -238,11 +230,11 @@ def init():
 
    if args.compare:
        # Comparison
-       do_compare(database, files, archive, archive2)
+       do_comparison(database, files, archive, archive2)
        return
 
    if args.add:
-       add_archive_to_db(archive, database)
+       add_archive_to_db(archive, database, args.force)
        return
 
    if args.create:

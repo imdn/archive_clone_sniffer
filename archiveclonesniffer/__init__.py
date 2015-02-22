@@ -3,13 +3,12 @@ __author__ = 'imad'
 
 from zipfile import *
 from rarfile import *
-from terminaltables import WindowsTable
+from terminaltables import SingleTable
 import archiveclonesniffer
-import os, os.path
+import os
+import os.path
 import sqlite3
 import sys
-import argparse
-
 
 class Database:
     def __init__(self, dbname):
@@ -43,7 +42,7 @@ class Database:
               JOIN archive AS A
                 ON ( A.archive_sha1 = C.archive_id )
             WHERE C.file_size != 0
-            GROUP BY A.archive_name;
+            GROUP BY A.archive_sha1;
         """
         self.cursor.executescript(stmt_ddl)
         #self.commit()
@@ -149,8 +148,8 @@ class Archive:
                     continue
                 if m.file_size > 0:
                     self.total_files += 1
-                member = ArchiveContent(name, path, m.file_size, m.compress_size, checksum, self.sha1)
-                self.contents.append(member)
+                    member = ArchiveContent(name, path, m.file_size, m.compress_size, checksum, self.sha1)
+                    self.contents.append(member)
 
         return self.contents
 
@@ -188,7 +187,7 @@ class Comparator:
             system.exit(-2)
 
     def debug_tbl(self, data):
-        table = WindowsTable(data, "Debug")
+        table = SingleTable(data, "Debug")
         print table.table
 
     def findFileinDB(self, file_crc32):
