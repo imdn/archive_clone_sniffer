@@ -32,94 +32,105 @@ class CmdProcessor:
         self.args = parser.parse_args()
 
 def print_banner(width, heading=None, char=None):
-   if char is None:
-      # u2550 - ══
-      # u2500 - ──
-      char = u'\u2550' #chr(205)
-   if heading is not None:
-      padded_heading = ' ' + heading + ' '
-      half_width = (width - len(padded_heading))/2
-      banner = char * half_width + padded_heading + char*half_width
-      if len(banner) < width:
-         banner = banner + char
-   else:
-      banner = char * width
-   print banner
+    if char is None:
+        # u2550 - ══
+        # u2500 - ──
+        char = u'\u2550' #chr(205)
+    if heading is not None:
+        padded_heading = ' ' + heading + ' '
+        half_width = (width - len(padded_heading))/2
+        banner = char * half_width + padded_heading + char*half_width
+        if len(banner) < width:
+            banner = banner + char
+    else:
+        banner = char * width
+    print banner
 
 def report(data, table_heading=None, description=None, banner=False):
-   global MAX_TABLE_WIDTH
-   table_data = data
-   table = SingleTable(table_data, table_heading)
-   if MAX_TABLE_WIDTH < table.table_width:
-      MAX_TABLE_WIDTH = table.table_width
-   print
-   if banner:
-      print_banner(table.table_width, 'REPORT')
-      print
-   if description:
-     print description
-   if (len(data) > 1):
-      if table_heading:
-         print
-      print table.table
+    global MAX_TABLE_WIDTH
+    table_data = data
+    table = SingleTable(table_data, table_heading)
+    if MAX_TABLE_WIDTH < table.table_width:
+        MAX_TABLE_WIDTH = table.table_width
+    print
+    if banner:
+        print_banner(table.table_width, 'REPORT')
+        print
+    if description:
+        print description
+    if (len(data) > 1):
+        if table_heading:
+            print
+        print table.table
 
 def show_full_report(matched_files, archive_stats, unmatched_stats):
-   global MAX_TABLE_WIDTH
-   if len(matched_files) > 1:
-      report(matched_files,  'Matching Files', "{} matching file(s) found".format(len(matched_files)-1), banner=True)
-      if len(archive_stats) > 1:
-         report(archive_stats, 'Archives', "{} archive(s) contain the matched files".format(len(archive_stats)-1))
-      report(unmatched_stats, description='{} unmatched file(s)'.format(len(unmatched_stats) -1))
-   else:
-      MAX_TABLE_WIDTH = 60
-      print
-      print_banner(MAX_TABLE_WIDTH, 'REPORT')
-      print
-      print "No matching files found in the current comparison"
-      print
-   print_banner(MAX_TABLE_WIDTH, char=u'\u2500')
+    global MAX_TABLE_WIDTH
+    if len(matched_files) > 1:
+        report(matched_files,  'Matching Files', "{} matching file(s) found".format(len(matched_files)-1), banner=True)
+        if len(archive_stats) > 1:
+            report(archive_stats, 'Archives', "{} archive(s) contain the matched files".format(len(archive_stats)-1))
+        report(unmatched_stats, description='{} unmatched file(s)'.format(len(unmatched_stats) -1))
+    else:
+        MAX_TABLE_WIDTH = 60
+        print
+        print_banner(MAX_TABLE_WIDTH, 'REPORT')
+        print
+        print "No matching files found in the current comparison"
+        print
+    print_banner(MAX_TABLE_WIDTH, char=u'\u2500')
 
 
 def do_comparison(database, files, archive, archive2):
-   if database is not None:
-      db = Database(database)
-      if archive is not None:
-         # compare db vs archive
-         print
-         print_banner(100, "Comparing: {} vs. {}".format(database, archive), u'\u2500')
-         comparator = Comparator(database=db, archive=archive)
-         file_match, archive_match, non_match = comparator.compareArchivexDatabase()
-      elif files is not None:
-         # compare db vs files
-         print
-         print_banner(100, "Comparing: {} vs. {}".format(database, '<file(s)>'), u'\u2500')
-         comparator = Comparator(database=db, files=files)
-         file_match, archive_match, non_match = comparator.compareFilexDatabase()
-      db.close()
-   elif archive is not None:
-      if archive2 is not None:
-         # compare two archives
-         print
-         print_banner(100, "Comparing: {} vs. {}".format(archive, archive2), u'\u2500')
-         comparator = Comparator(archive=archive, reference_archive=archive2)
-         file_match, archive_match, non_match = comparator.compareArchivexArchive()
-      elif files is not None:
-         # compare archive against files
-         print
-         print_banner(100, "Comparing: {} vs. {}".format(archive, '<file(s)>'), u'\u2500')
-         comparator = Comparator(archive=archive, files=files)
-         file_match, archive_match, non_match = comparator.compareFilexArchive()
-   else:
-      print
-      print "ERROR! Must compare {DB vs. Archive} OR {DB vs. Files} OR {Archive vs. Archive} OR {Archive vs. Files}"
-      return
+    try:
+        if database is not None:
+            db = Database(database)
+            if archive is not None:
+                # compare db vs archive
+                print
+                print_banner(100, "Comparing: {} vs. {}".format(database, archive), u'\u2500')
+                comparator = Comparator(database=db, archive=archive)
+                file_match, archive_match, non_match = comparator.compareArchivexDatabase()
+            elif files is not None:
+                # compare db vs files
+                print
+                print_banner(100, "Comparing: {} vs. {}".format(database, '<file(s)>'), u'\u2500')
+                comparator = Comparator(database=db, files=files)
+                file_match, archive_match, non_match = comparator.compareFilexDatabase()
+                print "Finish comparison"
+            db.close()
+        elif archive is not None:
+            if archive2 is not None:
+                # compare two archives
+                print
+                print_banner(100, "Comparing: {} vs. {}".format(archive, archive2), u'\u2500')
+                comparator = Comparator(archive=archive, reference_archive=archive2)
+                file_match, archive_match, non_match = comparator.compareArchivexArchive()
+            elif files is not None:
+                # compare archive against files
+                print
+                print_banner(100, "Comparing: {} vs. {}".format(archive, '<file(s)>'), u'\u2500')
+                comparator = Comparator(archive=archive, files=files)
+                file_match, archive_match, non_match = comparator.compareFilexArchive()
+        else:
+            print
+            print "ERROR! Must compare {DB vs. Archive} OR {DB vs. Files} OR {Archive vs. Archive} OR {Archive vs. Files}"
+            return
 
-   show_full_report(file_match, archive_match, non_match)
+        show_full_report(file_match, archive_match, non_match)
+
+    except sqlite3.Error as e:
+        print "ERROR! Could not reset database. Sqlite3 said: \"{}\"".format(e.message)
+        db.close()
+    except WindowsError as e:
+        print "ERROR! Err. Message : \"{}\"".format(e)
+        sys.exit(-1)
+
+
 
 def assert_argument_present(param, required_param, argument=None):
-   if param is None:
-      print "ERROR! '{}' argument must be supplied for '{}'".format(required_param,argument)
-      sys.exit(0)
+    if param is None:
+        print "ERROR! '{}' argument must be supplied for '{}'".format(required_param,argument)
+        sys.exit(0)
 
 def add_archive_to_db(archive, database, force_add=False):
     assert_argument_present(database, "-db/--database", "-add");
@@ -152,16 +163,16 @@ def add_archive_to_db(archive, database, force_add=False):
         db.close()
 
 def reset_db(database):
-   assert_argument_present(database, "-db/--database", "-r/-reset")
-   print "Resetting database '{}'".format(database)
-   try:
-       db = Database(database)
-       db.resetDB()
-       db.close()
+    assert_argument_present(database, "-db/--database", "-r/-reset")
+    print "Resetting database '{}'".format(database)
+    try:
+        db = Database(database)
+        db.resetDB()
+        db.close()
 
-   except sqlite3.Error as e:
-       print "ERROR! Could not reset database. Sqlite3 said: \"{}\"".format(e.message)
-       db.close()
+    except sqlite3.Error as e:
+        print "ERROR! Could not reset database. Sqlite3 said: \"{}\"".format(e.message)
+        db.close()
 
 
 def create_db(database):
@@ -176,22 +187,22 @@ def create_db(database):
         db.close()
 
 def run_sql_query(database, sql):
-   assert_argument_present(database, "-db/--database", "-s/--sql")
-   try:
-       db = Database(database)
-       header, records = db.runSQL(sql)
-       rows = map(list, records) # Convert tuple of tuples to list of lists
-       data = [header]
-       data.extend(rows)
-       table = SingleTable([map(str,row) for row in data]) # Convert all items in inner-list of lists to strings
-       #table.inner_heading_row_border = False
-       print table.table
-       print "{} row(s) affected".format(len(rows))
-       db.close()
+    assert_argument_present(database, "-db/--database", "-s/--sql")
+    try:
+        db = Database(database)
+        header, records = db.runSQL(sql)
+        rows = map(list, records) # Convert tuple of tuples to list of lists
+        data = [header]
+        data.extend(rows)
+        table = SingleTable([map(str,row) for row in data]) # Convert all items in inner-list of lists to strings
+        #table.inner_heading_row_border = False
+        print table.table
+        print "{} row(s) affected".format(len(rows))
+        db.close()
 
-   except sqlite3.Error as e:
-       print "ERROR! Could not run query. Sqlite3 said : \"{}\"".format(e.message)
-       db.close()
+    except sqlite3.Error as e:
+        print "ERROR! Could not run query. Sqlite3 said : \"{}\"".format(e.message)
+        db.close()
 
 
 def delete_archive_from_db(database, archive):
@@ -220,37 +231,37 @@ def delete_archive_from_db(database, archive):
         db.close()
 
 def init():
-   c = CmdProcessor()
-   args = c.args
+    c = CmdProcessor()
+    args = c.args
 
-   database = args.database
-   files = args.files
-   archive = args.archive
-   archive2 = args.archive2
+    database = args.database
+    files = args.files
+    archive = args.archive
+    archive2 = args.archive2
 
-   if args.compare:
-       # Comparison
-       do_comparison(database, files, archive, archive2)
-       return
+    if args.compare:
+        # Comparison
+        do_comparison(database, files, archive, archive2)
+        return
 
-   if args.add:
-       add_archive_to_db(archive, database, args.force)
-       return
+    if args.add:
+        add_archive_to_db(archive, database, args.force)
+        return
 
-   if args.create:
-       create_db(database)
-       return
+    if args.create:
+        create_db(database)
+        return
 
-   if args.reset:
-       reset_db(database)
-       return
+    if args.reset:
+        reset_db(database)
+        return
 
-   if args.sql:
-       run_sql_query(database, args.sql)
-       return
+    if args.sql:
+        run_sql_query(database, args.sql)
+        return
 
-   if args.delete:
-       delete_archive_from_db(database, archive)
-       return
+    if args.delete:
+        delete_archive_from_db(database, archive)
+        return
 
 init()
