@@ -25,7 +25,7 @@ class Database:
             archive_sha1 TEXT( 40 )  PRIMARY KEY
                                      NOT NULL
         );
-        CREATE TABLE archive_contents (
+        wCREATE TABLE archive_contents (
             filename      TEXT,
             path          TEXT,
             file_size     INTEGER,

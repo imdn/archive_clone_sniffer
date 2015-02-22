@@ -8,6 +8,8 @@ from terminaltables import AsciiTable, SingleTable
 import argparse
 
 MAX_TABLE_WIDTH = 0;
+LINE_CHAR = u'\u2500' #'─'
+#LINE_CHAR = '-'
 
 class CmdProcessor:
     def __init__(self):
@@ -17,7 +19,7 @@ class CmdProcessor:
         parser.add_argument('-f',   '--files', nargs = '+',   help = "List of files to compare against archive or database")
         parser.add_argument('-a',   '--archive', help = 'Archive to add, or to compare against another archive or database')
         parser.add_argument('-a2',  '--archive2', help = 'Archive to compare an archive against')
-        parser.add_argument('--force', help = 'Archive to compare an archive against', action="store_true")
+        parser.add_argument('--force', help = 'Force addition of archive to database even if there are matching files', action="store_true")
 
         operations_group = parser.add_mutually_exclusive_group()
         operations_group.add_argument ('--add', help="Add archive to database. 0-byte files and directories are not added", action="store_true")
@@ -30,12 +32,14 @@ class CmdProcessor:
         parser.set_defaults(add=False, create=False, reset=False, compare=False, force=False, delete=False)
 
         self.args = parser.parse_args()
+        if len(sys.argv) == 1:
+            print parser.format_usage()
 
 def print_banner(width, heading=None, char=None):
     if char is None:
         # u2550 - ══
         # u2500 - ──
-        char = u'\u2550' #chr(205)
+        char =  LINE_CHAR
     if heading is not None:
         padded_heading = ' ' + heading + ' '
         half_width = (width - len(padded_heading))/2
@@ -77,7 +81,7 @@ def show_full_report(matched_files, archive_stats, unmatched_stats):
         print
         print "No matching files found in the current comparison"
         print
-    print_banner(MAX_TABLE_WIDTH, char=u'\u2500')
+    print_banner(MAX_TABLE_WIDTH, char=LINE_CHAR)
 
 
 def do_comparison(database, files, archive, archive2):
@@ -87,13 +91,13 @@ def do_comparison(database, files, archive, archive2):
             if archive is not None:
                 # compare db vs archive
                 print
-                print_banner(100, "Comparing: {} vs. {}".format(database, archive), u'\u2500')
+                print_banner(100, "Comparing: {} vs. {}".format(database, archive), LINE_CHAR)
                 comparator = Comparator(database=db, archive=archive)
                 file_match, archive_match, non_match = comparator.compareArchivexDatabase()
             elif files is not None:
                 # compare db vs files
                 print
-                print_banner(100, "Comparing: {} vs. {}".format(database, '<file(s)>'), u'\u2500')
+                print_banner(100, "Comparing: {} vs. {}".format(database, '<file(s)>'), LINE_CHAR)
                 comparator = Comparator(database=db, files=files)
                 file_match, archive_match, non_match = comparator.compareFilexDatabase()
                 print "Finish comparison"
@@ -102,13 +106,13 @@ def do_comparison(database, files, archive, archive2):
             if archive2 is not None:
                 # compare two archives
                 print
-                print_banner(100, "Comparing: {} vs. {}".format(archive, archive2), u'\u2500')
+                print_banner(100, "Comparing: {} vs. {}".format(archive, archive2), LINE_CHAR)
                 comparator = Comparator(archive=archive, reference_archive=archive2)
                 file_match, archive_match, non_match = comparator.compareArchivexArchive()
             elif files is not None:
                 # compare archive against files
                 print
-                print_banner(100, "Comparing: {} vs. {}".format(archive, '<file(s)>'), u'\u2500')
+                print_banner(100, "Comparing: {} vs. {}".format(archive, '<file(s)>'), LINE_CHAR)
                 comparator = Comparator(archive=archive, files=files)
                 file_match, archive_match, non_match = comparator.compareFilexArchive()
         else:
@@ -119,7 +123,7 @@ def do_comparison(database, files, archive, archive2):
         show_full_report(file_match, archive_match, non_match)
 
     except sqlite3.Error as e:
-        print "ERROR! Could not reset database. Sqlite3 said: \"{}\"".format(e.message)
+        print "ERROR! Could not compare with database. Sqlite3 said: \"{}\"".format(e.message)
         db.close()
     except WindowsError as e:
         print "ERROR! Err. Message : \"{}\"".format(e)
@@ -144,13 +148,13 @@ def add_archive_to_db(archive, database, force_add=False):
             show_full_report(file_match, archive_match, non_match)
             print
             if not force_add:
-                print "WARNING! Will not add {} to database - '{}' until duplicate files are removed".format(archive, db.name)
+                print "WARNING! Will not add '{}' to database - '{}' until duplicate files are removed".format(archive, db.name)
                 db.close()
                 return
             else:
-                print "WARNING! {} contains duplicate files but will be added to database '{}' anyways".format(archive, db.name)
+                print "WARNING! '{}' contains duplicate files but will be added to database '{}' anyways".format(archive, db.name)
         print
-        print "Now adding {} to database ...\n".format(archive)
+        print "Now adding '{}' to database ...\n".format(archive)
         db.addArchivetoDB(arc)
         print "Done"
         db.close()
@@ -164,12 +168,12 @@ def add_archive_to_db(archive, database, force_add=False):
 
 def reset_db(database):
     assert_argument_present(database, "-db/--database", "-r/-reset")
-    print "Resetting database '{}'".format(database)
     try:
+        print "Resetting database '{}' ...".format(database)
         db = Database(database)
         db.resetDB()
         db.close()
-
+        print "Done"
     except sqlite3.Error as e:
         print "ERROR! Could not reset database. Sqlite3 said: \"{}\"".format(e.message)
         db.close()
@@ -178,10 +182,11 @@ def reset_db(database):
 def create_db(database):
     assert_argument_present(database, "-db/--database", "-c/--create")
     try:
+        print "Now creating database  '{}' ...".format(database)
         db = Database(database)
         db.initDB()
         db.close()
-
+        print "Done"
     except sqlite3.Error as e:
         print "ERROR! Could not create database. Sqlite3 said: \"{}\"".format(e.message)
         db.close()
