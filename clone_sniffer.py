@@ -177,7 +177,7 @@ def add_archive_to_db(archive, database, force_add=False):
             else:
                 print "WARNING! '{}' contains duplicate files but will be added to database '{}' anyways".format(archive, db.name)
         print
-        print "Now adding '{}' to database ...\n".format(archive)
+        print "Now adding '{}' to database ...".format(archive)
         db.addArchivetoDB(arc)
         print "Done"
         db.close()
