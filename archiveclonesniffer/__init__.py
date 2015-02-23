@@ -4,7 +4,7 @@ __author__ = 'imad'
 from zipfile import *
 from rarfile import *
 from terminaltables import SingleTable
-import archiveclonesniffer
+from . import archiveclonesniffer
 import os
 import os.path
 import sqlite3
@@ -56,7 +56,7 @@ class Database:
         self.cursor.executescript(stmt)
         #self.conn.commit();
         self.initDB()
-        print "Database Re-initialized"
+        print("Database Re-initialized")
 
     def addArchiveInfo(self, archiveInfo):
         payload = [archiveInfo]
@@ -92,6 +92,26 @@ class Database:
         cols = [col[0] for col in desc]
         return cols, results.fetchall()
 
+    def listArchiveContents(self, archive):
+        qry = """
+                SELECT
+                    archive_contents.filename AS Filename,
+                    archive_contents.path AS Path,
+                    archive_contents.file_size AS Size,
+                    archive_contents.compress_size AS 'Compressed Size',
+                    archive_contents.crc32 AS 'CRC-32',
+                    A.archive_name AS Archive,
+                    A.archive_sha1 AS 'Archive SHA-1'
+                FROM (
+                    SELECT *
+                    FROM archive
+                    WHERE archive_name LIKE '{}'
+                ) AS A
+                JOIN archive_contents
+                    ON (archive_contents.archive_id = A.archive_sha1 );
+            """.format(archive)
+        return self.runSQL(qry)
+
     def deleteArchive(self, archive):
         qry = "SELECT * FROM archive WHERE archive_name LIKE '{}'".format(archive)
         results = self.cursor.execute(qry)
@@ -103,7 +123,7 @@ class Database:
             cols = [col[0] for col in desc]
             return cols, records
         qry = "DELETE FROM archive WHERE archive_name LIKE '{}'".format(archive)
-        print qry
+        print(qry)
         results = self.cursor.execute(qry)
         records = results.fetchall()
         self.commit()
@@ -135,7 +155,7 @@ class Archive:
         elif self.extension == ".rar":
             archive = RarFile
         else:
-            print "Unknown archive extension"
+            print("Unknown archive extension")
             sys.exit(-1)
 
         with archive(self.archive_path, 'r') as afile:
@@ -153,6 +173,15 @@ class Archive:
 
         return self.contents
 
+    def listArchiveContents(self):
+        contents = self.getArchiveContents()
+        header = ['Name', 'Path', 'Size', 'Compressed Size', 'CRC-32']
+        results = []
+        for member in contents:
+            member_info = [member.name, member.path, humansize(member.file_size), humansize(member.compress_size), member.crc32]
+            results.append(member_info)
+        return header, results
+
 class ArchiveContent:
     def __init__(self, name, path, file_size, compress_size, crc32, archive_sha1 ):
         self.name = name
@@ -163,7 +192,7 @@ class ArchiveContent:
         self.archive_sha1 = archive_sha1
 
     def debug_msg(self):
-        print self.name, self.path, self.file_size, self.compress_size, self.crc32, self.archive_sha1
+        print(self.name, self.path, self.file_size, self.compress_size, self.crc32, self.archive_sha1)
 
 class Comparator:
     # Possible comparisons
@@ -183,12 +212,12 @@ class Comparator:
         elif self.database != None:
             self.compareArchivexDatabase()
         else:
-            print "Need to specify database or archive to compare against"
+            print("Need to specify database or archive to compare against")
             system.exit(-2)
 
     def debug_tbl(self, data):
         table = SingleTable(data, "Debug")
-        print table.table
+        print(table.table)
 
     def findFileinDB(self, file_crc32):
         table_contents = "archive_contents"
@@ -366,6 +395,7 @@ def humansize(nbytes):
     while nbytes >= 1024 and i < len(suffixes)-1:
         nbytes /= 1024.
         i += 1
-    f = ('%.2f' % nbytes).rstrip('0').rstrip('.')
+    #f = ('%.2f' % nbytes).rstrip('0').rstrip('.')
+    f = ('%.2f' % nbytes)
     return '%s %s' % (f, suffixes[i])
 
