@@ -1,14 +1,15 @@
-__author__ = 'imad'
+# -*- coding: utf-8 -*-
 
+import os
+import os.path
+import sqlite3
+import sys
 
 from zipfile import *
 from rarfile import *
 from terminaltables import SingleTable
 from . import archiveclonesniffer
-import os
-import os.path
-import sqlite3
-import sys
+
 
 class Database:
     def __init__(self, dbname):
@@ -123,7 +124,6 @@ class Database:
             cols = [col[0] for col in desc]
             return cols, records
         qry = "DELETE FROM archive WHERE archive_name LIKE '{}'".format(archive)
-        print(qry)
         results = self.cursor.execute(qry)
         records = results.fetchall()
         self.commit()

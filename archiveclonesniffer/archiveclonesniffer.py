@@ -1,4 +1,4 @@
-__author__ = 'imad'
+# -*- coding: utf-8 -*-
 
 import hashlib, zlib
 
